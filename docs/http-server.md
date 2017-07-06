@@ -1,5 +1,32 @@
 # http-server
 
+<!-- toc -->
+
+<!-- TOC depthFrom:1 depthTo:6 withLinks:1 updateOnSave:1 orderedList:0 -->
+
+- [http-server](#http-server)
+	- [使用说明](#使用说明)
+	- [引言](#引言)
+	- [内嵌HttpServer](#内嵌httpserver)
+	- [requestHandler](#requesthandler)
+		- [三种Handler写法](#三种handler写法)
+		- [简易请求分发](#简易请求分发)
+		- [vertx.web的Router](#vertxweb的router)
+	- [websocketHandler](#websockethandler)
+
+<!-- /TOC -->
+
+## 使用说明
+
+为了阅读时，能实践，请下载代码，并切换到相应的节点：
+
+``` bash
+$ git clone https://github.com/downgoon/vertx-hand-book.git
+$ git checkout e1c742ddf63ba1057db2cf168a94e8317c1c9723
+```
+
+## 引言
+
 刚接触[vertx](http://vertx.io/)的人，相信多数会被官方首页的一个超级简洁的``http-server``代码吸引：
 
 ``` java
