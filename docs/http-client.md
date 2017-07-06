@@ -204,4 +204,47 @@ OK
 
 ```
 
-服务器收到了4个块，其中最后一个块是空块，字节数为0，紧跟着一个空行表示结束。``chunked``协议规定：每个块在发送时，都有一个长度头，接着是具体内容。
+服务器收到了4个块，其中最后一个块是空块，字节数为0，紧跟着一个空行表示结束。``chunked``协议规定：每个块在发送时，都有一个长度头，接着是具体内容。如果我们换成非字符的数据呢？换个二进制数据：
+
+``` java
+static void postBufferChunked() throws Exception {
+		Vertx vertx = Vertx.vertx();
+		HttpClient httpClient = vertx.createHttpClient();
+
+		HttpClientRequest httpClientRequest = httpClient.post(8080, "localhost",
+				"/nc-server", httpClientResponse -> {
+					System.out.println("response received for: " + httpClientResponse.request().absoluteURI());
+				}).setChunked(true)
+				.putHeader("Content-Type", "application/o-stream");
+
+
+		httpClientRequest.write("Hello");
+		Thread.sleep(1000L * 3);
+
+    // 写入二进制数据
+		httpClientRequest.write(Buffer.buffer().appendInt(98));
+		Thread.sleep(1000L * 3);
+
+		httpClientRequest.end("OK");
+
+	}
+```
+
+nc接收的是：
+
+```
+$ nc -l 8080
+POST /nc-server HTTP/1.1
+Content-Type: application/o-stream
+Host: localhost:8080
+transfer-encoding: chunked
+
+5
+Hello
+4   注释：这个4表示Int是4个字节，下面的b表示binary-data的意思
+b
+2
+OK
+0
+
+```

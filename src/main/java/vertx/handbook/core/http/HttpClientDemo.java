@@ -2,6 +2,7 @@ package vertx.handbook.core.http;
 
 import io.vertx.core.MultiMap;
 import io.vertx.core.Vertx;
+import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpClient;
 import io.vertx.core.http.HttpClientRequest;
 import io.vertx.core.http.HttpMethod;
@@ -13,7 +14,9 @@ public class HttpClientDemo {
 
 		// postJsonDemo();
 		
-		postJsonFluentDemo();
+		// postJsonFluentDemo();
+		
+		 postBufferChunked();
 	}
 	
 	
@@ -79,4 +82,28 @@ public class HttpClientDemo {
 
 	}
 
+	
+	static void postBufferChunked() throws Exception {
+		Vertx vertx = Vertx.vertx();
+		HttpClient httpClient = vertx.createHttpClient();
+				
+		HttpClientRequest httpClientRequest = httpClient.post(8080, "localhost",
+				"/nc-server", httpClientResponse -> {
+					System.out.println("response received for: " + httpClientResponse.request().absoluteURI());
+				}).setChunked(true)
+				.putHeader("Content-Type", "application/o-stream");
+				
+		
+		httpClientRequest.write("Hello");
+		Thread.sleep(1000L * 3);
+
+		// httpClientRequest.write(Buffer.buffer().appendInt(98).appendByte((byte)0x11));
+		
+		httpClientRequest.write(Buffer.buffer().appendInt(98));
+		Thread.sleep(1000L * 3);
+		
+		httpClientRequest.end("OK");
+
+	}
+	
 }
