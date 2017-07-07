@@ -248,3 +248,65 @@ OK
 0
 
 ```
+
+### chunked 协议
+
+``chunked``（``分块传输``）是``HTTP/1.1``引入的。``chunked``协议最初的设计目的是：服务器可以逐渐得给浏览器推送数据，浏览器能逐渐的渲染网页。这个有点流媒体的感觉，视频不需要等全部下载完了才能播放，而是来了一点视频，就播放一点视频。
+
+通常，HTTP 应答消息中发送的数据是整个发送的，``Content-Length`` 消息头字段表示数据的长度。数据的长度很重要，因为客户端需要知道哪里是应答消息的结束，以及后续应答消息的开始。
+
+``Content-Length``的弊端就是：数据得一次性准备好，数据量大一点，就麻烦了。
+
+使用分块传输编码，数据分解成一系列数据块，并以一个或多个块发送，这样服务器可以发送数据而 **不需要预先知道发送内容的总大小（什么时候想结束了就发送一个'空块'就可以了）**。通常数据块的大小是一致的，但也不总是这种情况。
+
+>简单说，``chunked``就是网页领域的``流媒体``，它像流视频一样，不用等视频全部下载完就可以播放，下载一点，播放一点。浏览器渲染网页也是一样，收到一点``html``内容，就渲染一点``html``内容。
+
+**分块传输** 的应用场景：
+
+- 预先不知道``Content-Length``： 服务器发送响应时，上不知道``Content-Length``，需要按 **分块传输**。
+- 最后填写HTTP头：响应体如果采用``chunked``传输，同时在HTTP头要对响应体做``摘要签名``，那么麻烦问题来了，数据是流式的，只有最后才知道所有的内容，进而才能算出``摘要签名``，所以``chunked``协议下，**HTTP也可以事后追加**。可是从前面抓包的情况看，``chunked-size\r\nchunked-data``的结构看，似乎没法再写HTTP头了呀？查下``chunked``协议：
+
+![](assets/img-http-chunked.png)
+
+>可以看到，在最后一个``chunked``（chunked-size为0的）后面，有一个可选的拓展头，即使这个拓展头没有，最后必须以空行结束（所以，``chunked``并不是以0号块结束，而是以空行结束）。
+
+另外，除了服务端向客户端推送数据可以``chunked``外，客户端向服务端也是可以``chunked``的。
+
+那什么样的场景下，不知道``Content-Length``，还要最后算``摘要签名``呢？用的最多大的是 **压缩传输**。
+
+>在压缩的情形中，分块编码(``chunked``)有利于 **一边进行压缩一边发送数据** ，而不是先完成压缩过程以得知压缩后数据的大小。
+
+看一个``gzip``压缩的抓包：
+
+``` http
+HTTP/1.1 200 OK
+Date: Wed, 06 Jul 2016 06:59:55 GMT
+Server: Apache
+Accept-Ranges: bytes
+Transfer-Encoding: chunked
+Content-Type: text/html
+Content-Encoding: gzip
+Age: 35
+X-Via: 1.1 daodianxinxiazai58:88 (Cdn Cache Server V2.0), 1.1 yzdx147:1 (Cdn
+Cache Server V2.0)
+Connection: keep-alive
+
+a
+....k.|W..
+166
+..OO.0...&~..;........]..(F=V.A3.X..~z...-.l8......y....).?....,....j..h .6
+....s.~.>..mZ .8/..,.)B.G.`"Dq.P].f=0..Q..d.....h......8....F..y......q.....4
+{F..M.A.*..a.rAra.... .n>.D
+..o@.`^.....!@ $...p...%a\D..K.. .d{2...UnF,C[....T.....c....V...."%.`U......?
+D....#..K..<.....D.e....IFK0.<...)]K.V/eK.Qz...^....t...S6...m...^..CK.XRU?m..
+.........Z..#Uik......
+0
+```
+
+其中``Transfer-Encoding: chunked``表明按分块传输，``Content-Encoding: gzip``表示内容是压缩形式。这个抓包，还不全面，传输内容最后没有数字签名。因此，在``chunked``上，看不到拓展头。
+
+
+# 参考资料
+
+- [HTTP简介](https://mp.weixin.qq.com/s?__biz=MzI5NjAxODQyMg==&mid=2676479748&idx=1&sn=6baa37343d61e24d38661ecbcfde2d4f&mpshare=1&scene=1&srcid=0706VLyHbzUTYobWEbZ6cFhV&pass_ticket=1TqifluyM83yuwcJTCnnhMxYh1gSoZ7Xb0LgDOEUQwQ%3D#rd)： 内含``chunked``协议描述。
+- [HTTP 协议常用的三种数据格式](https://mp.weixin.qq.com/s?__biz=MjM5NTEwMTAwNg==&mid=2650209502&idx=2&sn=1fdf51bd673e8f37fb7db588f5140f76&chksm=befffcff898875e9ddd93e8c4ac08c4e2a0f3e51c35931176e243259dae84bc0bdcb60ee0fbb&mpshare=1&scene=1&srcid=07068Jufkf31zbPLwZ8Dtqps&pass_ticket=1TqifluyM83yuwcJTCnnhMxYh1gSoZ7Xb0LgDOEUQwQ%3D#rd)：``gzip``压缩、``chunked``传输和``MultiPart``上传
