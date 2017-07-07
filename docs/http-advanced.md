@@ -8,6 +8,8 @@
 - http/1.1 pipe-lining
 - http/2 multiplexing
 
+## 配置高级模式
+
 
 
 ## keep-alive
