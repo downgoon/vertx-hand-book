@@ -4,6 +4,7 @@ import io.vertx.core.MultiMap;
 import io.vertx.core.Vertx;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpClient;
+import io.vertx.core.http.HttpClientOptions;
 import io.vertx.core.http.HttpClientRequest;
 import io.vertx.core.http.HttpMethod;
 import io.vertx.core.json.JsonObject;
@@ -16,7 +17,12 @@ public class HttpClientDemo {
 		
 		// postJsonFluentDemo();
 		
-		 postBufferChunked();
+	   // postBufferChunked();
+		
+	  //	getSimple();
+		
+		getSimpleOptions();
+		
 	}
 	
 	
@@ -104,6 +110,39 @@ public class HttpClientDemo {
 		
 		httpClientRequest.end("OK");
 
+	}
+	
+	static void getSimple() throws Exception {
+		Vertx vertx = Vertx.vertx();
+		HttpClient httpClient = vertx.createHttpClient();
+				
+		httpClient.getNow(8080, "localhost", "/dbapi/default/employee", httpClientResponse -> {
+			System.out.println("statusCode: " + httpClientResponse.statusCode());
+			
+			httpClientResponse.bodyHandler(buffer -> {
+				System.out.println("bodyHandler: ");
+				JsonObject json = buffer.toJsonObject();
+				System.out.println("json body: " + json);
+			});
+			
+		});
+	}
+	
+	
+	static void getSimpleOptions() throws Exception {
+		Vertx vertx = Vertx.vertx();
+		HttpClient httpClient = vertx.createHttpClient(new HttpClientOptions().setDefaultHost("localhost").setDefaultPort(8080));
+				
+		httpClient.getNow("/dbapi/default/employee", httpClientResponse -> {
+			System.out.println("statusCode: " + httpClientResponse.statusCode());
+			
+			httpClientResponse.bodyHandler(buffer -> {
+				System.out.println("bodyHandler: ");
+				JsonObject json = buffer.toJsonObject();
+				System.out.println("json body: " + json);
+			});
+			
+		});
 	}
 	
 }

@@ -306,6 +306,121 @@ D....#..K..<.....D.e....IFK0.<...)]K.V/eK.Qz...^....t...S6...m...^..CK.XRU?m..
 其中``Transfer-Encoding: chunked``表明按分块传输，``Content-Encoding: gzip``表示内容是压缩形式。这个抓包，还不全面，传输内容最后没有数字签名。因此，在``chunked``上，看不到拓展头。
 
 
+## 编码风格
+
+前面提到了，编码风格上，``vertx``是：请求还没发，就预先设置好处理。
+
+``` java
+httpClient.post(..., httpClientResponse -> {
+
+}).setChunked(true)  // 设置chunked方式，在执行write之前
+    .putHeader("Content-Type", "application/json")
+    .write("{\"id\": 101, \"name\": \"zhangsan\", ")
+    .write("\"age\": 28, \"credit\": 9.3 }")
+    .end();  // 相当于给异步写一个flush()操作，强制写到远程去
+```
+
+而不是，发的同时，设置：
+
+``` java
+httpClientRequest.send(json.toBuffer(), httpClientResponse -> {
+  System.out.println("statusCode: " + httpClientResponse.statusCode());
+});
+```
+
+当然它也允许，我们事后设置（但一定是发送之前，只不过可以创建请求之后）：
+
+``` java
+HttpClientRequest request = client.post("some-uri");
+request.handler(response -> {
+  System.out.println("Received response with status code " + response.statusCode());
+});
+```
+
+
+## quick get
+
+如果只是一个不用带包体的GET请求，可以直接发送并对响应进行处理。这个代码非常类似``JavaScript``：
+
+``` java
+static void getSimple() throws Exception {
+		Vertx vertx = Vertx.vertx();
+		HttpClient httpClient = vertx.createHttpClient();
+
+		httpClient.getNow(8080, "localhost", "/dbapi/default/employee", httpClientResponse -> {
+			System.out.println("statusCode: " + httpClientResponse.statusCode());
+
+			httpClientResponse.bodyHandler(buffer -> {
+				System.out.println("bodyHandler: ");
+				JsonObject json = buffer.toJsonObject();
+				System.out.println("json body: " + json);
+			});
+
+		});
+	}
+```
+
+如果是服务器对服务器的请求，多数情况下，都是访问一个机器和端口，还可以设置到默认参数里面：
+
+``` java
+HttpClient httpClient = vertx.createHttpClient(
+    new HttpClientOptions()
+          .setDefaultHost("localhost")
+          .setDefaultPort(8080));
+
+		httpClient.getNow("/dbapi/default/employee", httpClientResponse -> {
+      ....
+    });
+```
+
+这里接收响应，用的是``httpClientResponse.bodyHandler()``。刚才我们前面谈到``chunked``了，那么数据如果分块到达怎么办？再者``Java NIO``都是基于事件的，TCP流一个逻辑完整的报文是分两次到达的，``httpClientResponse.bodyHandler()``会触发两次，还是一次呢？
+
+关于这点官方文档明确说了：``httpClientResponse.bodyHandler()``只会触发一次，而且触发的时候，已经把各个分块整到一起了（``in one piece``）。我们看官方具体描述。
+
+### BodyHandler
+
+``` java
+/**
+ * Convenience method for receiving the entire request body in one piece.
+ * <p>
+ * This saves you having to manually set a dataHandler and an endHandler and append the chunks of the body until
+ * the whole body received. Don't use this if your request body is large - you could potentially run out of RAM.
+ *
+ * @param bodyHandler This handler will be called after all the body has been received
+ */
+@Fluent
+HttpClientResponse bodyHandler(Handler<Buffer> bodyHandler);
+```
+
+强调点是：响应数据是``in one piece``的，即使网络上分两次或多次到达。框架给我们做了这个工作，当然我们也可以自己做这个工作：
+
+- ``dataHandler``： 每次网络上到达一点数据，``dataHandler``会被触发一次。
+- ``endHandler``: 最后一次到达时，会触发``endHandler``。
+
+什么时候，需要自己处理多次到达呢？数据量大的时候，一次性处理所有内存不够，另外分次处理或能提供实时性，有点类似流媒体。
+
+
+### dataHandler 与 endHandler
+
+找遍了``API``没有找到``dataHandler``，原来直接就是 ``handler``，而且是在超类里面：
+
+``` java
+public interface ReadStream<T> extends StreamBase {
+
+  /**
+   * Set a data handler. As data is read, the handler will be called with the data.
+   *
+   * @return a reference to this, so the API can be used fluently
+   */
+  @Fluent
+  ReadStream<T> handler(@Nullable Handler<T> handler);
+
+}
+
+```
+
+
+
 # 参考资料
 
 - [HTTP简介](https://mp.weixin.qq.com/s?__biz=MzI5NjAxODQyMg==&mid=2676479748&idx=1&sn=6baa37343d61e24d38661ecbcfde2d4f&mpshare=1&scene=1&srcid=0706VLyHbzUTYobWEbZ6cFhV&pass_ticket=1TqifluyM83yuwcJTCnnhMxYh1gSoZ7Xb0LgDOEUQwQ%3D#rd)： 内含``chunked``协议描述。
