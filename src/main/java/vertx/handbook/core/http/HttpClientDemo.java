@@ -21,7 +21,12 @@ public class HttpClientDemo {
 		
 	  //	getSimple();
 		
-		getSimpleOptions();
+	//	getSimpleOptions();
+		
+		
+		// getOnePiece();
+		
+		getTwoTimes();
 		
 	}
 	
@@ -145,4 +150,48 @@ public class HttpClientDemo {
 		});
 	}
 	
+	
+	static void getOnePiece() throws Exception {
+		Vertx vertx = Vertx.vertx();
+		HttpClient httpClient = vertx.createHttpClient(
+				new HttpClientOptions()
+				.setDefaultHost("localhost")
+				.setDefaultPort(8080)
+				.setLogActivity(true));
+				
+		httpClient.getNow("/dbapi/default/employee/2", httpClientResponse -> {
+			System.out.println("statusCode: " + httpClientResponse.statusCode());
+			
+			httpClientResponse.bodyHandler(buffer -> {
+				System.out.println("bodyHandler: ");
+				JsonObject json = buffer.toJsonObject();
+				System.out.println("json body: " + json);
+			});
+			
+		});
+	}
+	
+	static void getTwoTimes() throws Exception {
+		Vertx vertx = Vertx.vertx();
+		HttpClient httpClient = vertx.createHttpClient(
+				new HttpClientOptions()
+				.setDefaultHost("localhost")
+				.setDefaultPort(8080)
+				.setLogActivity(true));
+				
+		httpClient.getNow("/dbapi/default/employee/2", httpClientResponse -> {
+			
+			
+			System.out.println("statusCode: " + httpClientResponse.statusCode());
+			
+			httpClientResponse.handler(buffer -> {
+				System.out.println("recv data: " + buffer.toString());
+			});
+			
+			httpClientResponse.endHandler((v) -> {
+				System.out.println("finish data");
+			});
+			
+		});
+	}
 }

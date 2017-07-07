@@ -399,6 +399,81 @@ HttpClientResponse bodyHandler(Handler<Buffer> bodyHandler);
 
 什么时候，需要自己处理多次到达呢？数据量大的时候，一次性处理所有内存不够，另外分次处理或能提供实时性，有点类似流媒体。
 
+我们来构建一个HTTP服务器，它将一个JSON Body通过两次发送，完整代码见 [[MiniHttpdPartial.java](src/main/java/vertx/handbook/core/http/MiniHttpdPartial.java)，其中片段：
+
+``` java
+writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+
+writer.write("HTTP/1.1 200 OK\r\n");
+writer.write("Server: autorest4db\r\n");
+writer.flush();
+
+System.out.println("partial header sent, wait 2 sec ...");
+Thread.sleep(1000L * 2);
+
+
+writer.write("Content-Type: application/json;charset=UTF-8\r\n");
+writer.write("Content-Length: 46\r\n");
+writer.write("\r\n");
+
+String part1 = "{\"id\":2,\"name\":\"laoer\",";
+String part2= "\"age\":30,\"credit\":null}";
+
+writer.write(part1);
+writer.flush();
+
+System.out.println("part#1 sent, wait 3 sec ...");
+Thread.sleep(1000L * 3);
+
+writer.write(part2);
+System.out.println("part#2 sent, last ok");
+
+writer.flush();
+```
+
+上述代码，发送完第1部分后，睡眠了3分钟，再发送第2片段。
+
+服务端的日志：
+
+```
+java MiniHttpdPartial
+wait for a new connection ...
+got a connection
+GET /dbapi/default/employee/2 HTTP/1.1
+Host: localhost:8080
+
+partial header sent, wait 2 sec ...
+part#1 sent, wait 3 sec ...
+part#2 sent, last ok
+Response Sent OK
+```
+
+客户端使用``bodyHandler``的结果：
+
+``` java
+static void getOnePiece() throws Exception {
+		Vertx vertx = Vertx.vertx();
+		HttpClient httpClient = vertx.createHttpClient(
+				new HttpClientOptions()
+				.setDefaultHost("localhost")
+				.setDefaultPort(8080)
+				.setLogActivity(true));
+
+		httpClient.getNow("/dbapi/default/employee/2", httpClientResponse -> {
+			System.out.println("statusCode: " + httpClientResponse.statusCode());
+
+			httpClientResponse.bodyHandler(buffer -> {
+				System.out.println("bodyHandler: ");
+				JsonObject json = buffer.toJsonObject();
+				System.out.println("json body: " + json);
+			});
+
+		});
+	}
+```
+
+尽管，JSON在服务端是分两次发送的，但是客户端的``bodyHandler``的回调是等最后一段都到达的时候，才触发的。
+如果我们不用``bodyHandler``，而改用``dataHandler``和``endHandler``又会怎样呢？
 
 ### dataHandler 与 endHandler
 
@@ -419,6 +494,45 @@ public interface ReadStream<T> extends StreamBase {
 
 ```
 
+我们的服务端依然是 [MiniHttpdPartial.java](src/main/java/vertx/handbook/core/http/MiniHttpdPartial.java)。
+但我们客户端代码，是通过``dataHandler``和``endHandler``来获取包体：
+
+``` java
+static void getTwoTimes() throws Exception {
+		Vertx vertx = Vertx.vertx();
+		HttpClient httpClient = vertx.createHttpClient(
+				new HttpClientOptions()
+				.setDefaultHost("localhost")
+				.setDefaultPort(8080)
+				.setLogActivity(true));
+
+		httpClient.getNow("/dbapi/default/employee/2", httpClientResponse -> {
+
+
+			System.out.println("statusCode: " + httpClientResponse.statusCode());
+
+			httpClientResponse.handler(buffer -> {
+				System.out.println("recv data: " + buffer.toString());
+			});
+
+			httpClientResponse.endHandler((v) -> {
+				System.out.println("finish data");
+			});
+
+		});
+	}
+```
+
+运行结果是：
+
+``` bash
+statusCode: 200
+recv data: {"id":2,"name":"laoer",
+recv data: "age":30,"credit":null}
+finish data
+```
+
+结果显示，一个完整的JSON会分两次到达。显然，对于普通的小数据，直接用``bodyHandler``就好，它会让我们降低开发负担。
 
 
 # 参考资料
