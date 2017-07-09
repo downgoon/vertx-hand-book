@@ -3,8 +3,6 @@
 <!-- TOC depthFrom:1 depthTo:6 withLinks:1 updateOnSave:1 orderedList:0 -->
 
 - [WebSocketd](#websocketd)
-- [!/bin/bash](#binbash)
-- [Count from 1 to 10 with a sleep](#count-from-1-to-10-with-a-sleep)
 	- [客户端](#客户端)
 	- [更多趣味实验](#更多趣味实验)
 		- [日志输出到Web](#日志输出到web)
