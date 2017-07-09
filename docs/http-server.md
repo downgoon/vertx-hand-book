@@ -347,4 +347,100 @@ router.addRoute("/nohandler", null);
 
 因此还是请求不到，报告``404 NOT FOUND``。
 
+----
+
 ## websocketHandler
+
+
+>``WebSocket`` 协议在2008年诞生，**2011年成为国际标准**。所有浏览器都已经支持了。
+>早期  [HTML5](http://www.jb51.net/w3school/html5/) 并没有形成业界统一的规范，各个浏览器和应用服务器厂商有着各异的类似实现，如 IBM 的 MQTT，Comet 开源框架等，直到 2014 年，HTML5 在 IBM、微软、Google 等巨头的推动和协作下终于尘埃落地，正式从草案落实为实际标准规范，各个应用服务器及浏览器厂商逐步 **开始统一** 。``WebSocket`` 最重要的就是 ``双向通信``，动机就是解决 [Server-Push](https://en.wikipedia.org/wiki/Push_technology)的场景。
+
+``WebSocket``的特点：
+
+- 双向通信：支持``Sever-Push``
+- 寄生于HTTP: 端口依然是80和443（当``HTTPS``的时候），握手阶段走HTTP，握手完成后才切换到``WebSocket``。这样的好处是很容易通过防火墙。顺便说一下，HTTP服务器要很强大，协议解析的时候，有些是HTTP的，有些是``WebSocket``的，而且``WebSocket``又是寄生于HTTP的（在HTTP头里面发送一个声明说：“我要走WebSocket了”，服务器回答说：“Upgrate（升级到``WebSocket``）”）。
+- 协议标识符``ws``： [ws://example.com:80/some/path](ws://example.com:80/some/path) 如果是SSL，则``wss``。
+- 跟HTTP不是一个东西：``WebSocket``协议通信时，跟HTTP协议没半毛钱关系，它就是``Socket``（严格也不能这么讲，因为Socket是TCP层对应用层的接口，它本身并不是应用层协议，而WebSocket是应用层协议）；但修饰词``Web``是因为握手阶段需要在``HTTP``协议上发起一个``Upgrate request``（升级为``WebSocket``）。
+- 数据载荷：可以是文本，也可以是二进制。
+
+
+>``WebSocket`` is designed to be implemented in web browsers and web servers, but it **can be used by any client or server application**. The WebSocket Protocol is an **independent TCP-based protocol**. Its only relationship to HTTP is that its ``handshake`` is interpreted by HTTP servers as an ``Upgrade request``.[1]
+
+
+>**The communications are done over TCP port number 80** (or 443 in the case of TLS-encrypted connections), which is of benefit for those environments which block non-web Internet connections using a firewall. （这点在大公司简直非常提供效率，一些大公司开其他端口，走的申请流程让人窒息，而80端口通常默认就是开通的）
+
+
+### 握手报文
+
+- **Client request** (``Upgrade request``)：客户端申请换道``websocket``
+
+``` http
+GET /chat HTTP/1.1
+Host: server.example.com
+Upgrade: websocket
+Connection: Upgrade
+Sec-WebSocket-Key: x3JJHMbDL1EzLkh9GBhXDw==
+Sec-WebSocket-Protocol: chat, superchat
+Sec-WebSocket-Version: 13
+Origin: http://example.com
+```
+
+其中重要的两行：
+
+>``Connection: Upgrade``     // TCP链接要升级换道，不走HTTP报文了。
+>``Upgrade: websocket``     // 换道哪呢？``websocket``
+
+- **Server response**:
+
+``` http
+HTTP/1.1 101 Switching Protocols
+Upgrade: websocket
+Connection: Upgrade
+Sec-WebSocket-Accept: HSmrc0sMlYUkAGmm5OPpG2HaGWk=
+Sec-WebSocket-Protocol: chat
+```
+
+回复也有：
+>Upgrade: websocket
+>Connection: Upgrade
+
+另外注意：响应码不是``200``，而是``101 Switching Protocols``。
+
+
+握手的奇特之处：在一个端口上，可以跑两种协议：HTTP和WebSocket。这点跟我们平时的绝大多数服务协议不同，我们都是一个端口一种协议；实际上，如果理解底层socket的话，要在一个端口上走两种协议其实并不难，只是报文解码和动作不同而已。
+
+>The handshake resembles HTTP in allowing servers to handle HTTP connections as well as WebSocket connections **on the same port**. Once the connection is established, communication **switches to a bidirectional binary protocol which doesn't conform to the HTTP protocol**.
+
+握手阶段，除了刚才提到的``Upgrade``关键字外，还有两个``Key``：请求中的``Sec-WebSocket-Key: x3JJHMbDL1EzLkh9GBhXDw==``，响应中的``Sec-WebSocket-Accept: HSmrc0sMlYUkAGmm5OPpG2HaGWk=``。前者是``随机数``的Base64编码，后者是它的``Hash值``的Base64编码。
+
+### 默认跨域
+
+平时``AJAX``的时候，有跨域问题。但浏览器的这个行为其实很扯淡，大家平时也都是设置为允许跨域，安全问题走安全机制，比如要求登陆。所以``WebSocket``的设计的时候，也注意到这个现实问题，所以，这次人家默认就是允许跨域的，但是依然把``Origin``上报上去，交给服务器去判断，要不要禁止某些``Origin``。
+
+>It is important (from a security perspective) to validate the "Origin" header during the connection establishment process on the serverside (against the expected origins) to avoid Cross-Site WebSocket Hijacking attacks, which might be possible when the connection is authenticated with Cookies or HTTP authentication. It is better to use tokens or similar protection mechanisms to authenticate the WebSocket connection when sensitive (private) data is being transferred over the WebSocket.
+
+### 读写数据
+
+Websocket的数据传输是frame形式传输的，比如会 **将一条消息分为几个frame**，按照先后顺序传输出去。
+这样做会有几个好处：
+1）大数据的传输可以分片传输，不用考虑到数据大小导致的长度标志位不足够的情况。
+2）和http的chunk一样，可以边生成数据边传递消息，即提高传输效率。
+
+最早的``HTTP``都直接是一个``Content-Length``，这种协议实现简单。但弊端是，随着应用发展，如果包体部分太大，就会支持不了。所以后来引入了``chunked``传输，可以将报文分多个块。再到后来的协议，``websocket``和HTTP/2的设计，一上来就考虑了分块传输的问题，都能将一个大的报文分拆成多个``Frame``。除了大的考虑，``websocket``初衷还要解决``Server-Push``的问题，既然是``Server-Push``就有个问题是，事件是慢慢到达的，来一点内容，就实时推送一点，而不用等全部完后再推送。
+
+> WebSocket transmissions are described as "messages", where **a single message can optionally be split across several data frames**. This can allow for sending of messages where initial data is available but the complete length of the message is unknown (it sends one data frame after another until the end is reached and marked with the FIN bit).
+
+![](assets/img-websocket-frame.png)
+
+
+``vertx``在读写数据这块，有两个接口：一个是读写原生的``Frame``；另一个是读写消息（至于消息是否分拆成多个``Frame``由``vertx``底层决定，用户只用关心消息，当然用户可以设置``FrameSize``，这样底层可以知道该拆多大一块）。从数据类型来讲，可以读写二进制，也可以读写文本。
+
+
+
+
+### 参考资料
+
+- [阮一峰讲解WebSocket](http://www.ruanyifeng.com/blog/2017/05/websocket.html?utm_source=tuicool&utm_medium=referral)
+- [Sever-Push](https://en.wikipedia.org/wiki/Push_technology)
+- [WebSocketd实时监控轻而易举](http://websocketd.com/)
+- [实时消息类应用](http://blog.sina.com.cn/s/blog_727942e70102x304.html)：AMQP,MQTT,WebSocket,XMPP

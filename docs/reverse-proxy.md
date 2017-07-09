@@ -2,7 +2,7 @@
 
 ## 一个简单代理服务器
 
-为了感受下代理服务器的基本原理，我们用传统代码，写了个简单的代理服务器，详见 [MiniSockProxy.java](src/main/java/vertx/handbook/core/http/MiniSockProxy.java)，它的功能如图：
+为了感受下代理服务器的基本原理，我们用传统代码，写了个简单的代理服务器，详见 [MiniSockProxy.java](../src/main/java/vertx/handbook/core/http/MiniSockProxy.java)，它的功能如图：
 
 ![](assets/img-mini-proxy-arc.png)
 
@@ -24,6 +24,14 @@ while ((req_size = c_dis.read(req_buf)) != -1) { // forward request
 ```
 
 响应转发，几乎是同样的逻辑，不同的只是跑在不同的线程中（不然一个线程没法做到上行和下行同时进行）。
+
+## Pump.pump 流复制
+
+``vertx``为了方便做``proxy``这类应用，也支持``流复制``，还专门提供了一个工具，叫``Pump.pump(ReadStream, WriteStream)``，语义就是把数据从``ReadStream``读出来，并写入``WriteStream``里面。更重要的是，``vertx``把很多东西都做成了``ReadStream``和``WriteStream``的子类，所以可以很轻松的在``文件``，``网络流``，HTTP Body 等之间做快速的``流复制``。
+
+![](assets/img-read-write-stream-classes.png)
+
+
 
 # 附录-1：API Gateway 相关
 

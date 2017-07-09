@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<pre id="vscreen"></pre>
+
+<script>
+
+  // helper function: log message to screen
+  function log(msg) {
+    document.getElementById('vscreen').textContent += msg + '\n';
+  }
+
+  // setup websocket with callbacks
+  var ws = new WebSocket('ws://localhost:10086/');
+  ws.onopen = function() {
+    log('CONNECT');
+  };
+
+  ws.onclose = function() {
+    log('DISCONNECT');
+  };
+
+  // be notified from server and log the message into 'vscreen' element
+  ws.onmessage = function(event) {
+    log('MESSAGE: ' + event.data);
+  };
+
+</script>

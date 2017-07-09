@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+
+<head>
+  <title>WebSocketd Chartroom</title>
+</head>
+
+<body>
+  <pre id="vstdout"></pre>
+
+  <input type="text" name="cmd" id="vstdin" onkeydown = "if (event.keyCode == 13)
+                        document.getElementById('btnsend').click()"/>
+
+  <button type="button" id="btnsend">send</button>
+
+  <script>
+
+  // helper function: log message to screen
+  function log(msg) {
+    document.getElementById('vstdout').textContent += msg + '\n';
+  }
+
+  // setup websocket with callbacks
+  var ws = new WebSocket('ws://localhost:10086/');
+
+  ws.onopen = function() {
+    log('CONNECT');
+  };
+
+  ws.onclose = function() {
+    log('DISCONNECT');
+  };
+
+  // be notified from server and log the message into 'vscreen' element
+  ws.onmessage = function(event) {
+    log('MESSAGE: ' + event.data);
+  };
+
+  // add 'onclick' handler on 'send' Button
+  document.getElementById('btnsend').onclick = function () {
+    var cmdTxt = document.getElementById('vstdin').value;
+    // log the message before sending to the chat room
+    log('me:>' + cmdTxt);
+    ws.send(cmdTxt);
+    document.getElementById('vstdin').value = null;
+  };
+
+  </script>
+
+</body>
